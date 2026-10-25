@@ -5,6 +5,7 @@ edition.workspace = true
 
 [build-dependencies]
 slint-build = "1"
+embed-resource = "3"
 
 [dependencies]
 slint = { version = "1", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-path", "accessibility"] }
