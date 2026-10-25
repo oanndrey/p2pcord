@@ -7,7 +7,7 @@ use std::{
 };
 
 use chrono::{DateTime, Datelike, Local, NaiveDate, TimeZone};
-use p2pcord_core::{Node, NodeEvent, Ticket, TopicId, VoiceMember};
+use p2pcord_core::{release, Node, NodeEvent, Ticket, TopicId, VoiceMember};
 use slint::{Color, ModelRc, SharedString, VecModel, Weak};
 use tokio::sync::mpsc;
 
@@ -37,6 +37,8 @@ enum Cmd {
     Mute(bool),
     Deafen(bool),
     Update,
+    /// Volume em % de alguém da voz (chave em hex) ou do meu microfone.
+    Volume { id: String, me: bool, percent: i32 },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -65,8 +67,10 @@ fn main() -> anyhow::Result<()> {
     ui.on_set_muted(move |on| drop(tx.send(Cmd::Mute(on))));
     let tx = cmd_tx.clone();
     ui.on_set_deafened(move |on| drop(tx.send(Cmd::Deafen(on))));
-    let tx = cmd_tx;
+    let tx = cmd_tx.clone();
     ui.on_install_update(move || drop(tx.send(Cmd::Update)));
+    let tx = cmd_tx;
+    ui.on_set_volume(move |id, me, percent| drop(tx.send(Cmd::Volume { id: id.into(), me, percent })));
 
     // A rede roda num runtime tokio separado; a UI fica na thread principal.
     let weak = ui.as_weak();
@@ -266,6 +270,14 @@ async fn handle_cmd(node: &Node, ui: &Weak<AppWindow>, st: &mut State, cmd: Cmd)
             node.set_deafened(on);
             update_voice_ui(node, ui, st);
         }
+        Cmd::Volume { id, me, percent } => {
+            let volume = percent as f32 / 100.0;
+            if me {
+                node.set_mic_volume(volume)?;
+            } else {
+                node.set_user_volume(release::unhex::<32>(&id)?, volume)?;
+            }
+        }
         Cmd::Update => {
             let Some(rel) = &st.update else { return Ok(()) };
             ui_do(ui, |ui| ui.set_updating(true));
@@ -341,6 +353,8 @@ fn update_voice_ui(node: &Node, ui: &Weak<AppWindow>, st: &State) {
         .map(|list| {
             list.iter()
                 .map(|m| VoiceItem {
+                    id: release::hex(&m.id).into(),
+                    volume: (m.volume * 100.0).round() as i32,
                     initial: first_initial(&m.name),
                     color: name_color(&m.name),
                     name: m.name.clone().into(),

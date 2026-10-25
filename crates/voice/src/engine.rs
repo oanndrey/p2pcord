@@ -7,7 +7,7 @@
 use std::{
     collections::{HashMap, VecDeque},
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU32, Ordering},
         mpsc, Arc, Mutex,
     },
     thread,
@@ -124,8 +124,8 @@ impl PeerRx {
         }
     }
 
-    /// Soma o áudio desta pessoa em `out`.
-    fn mix_into(&mut self, out: &mut [f32]) {
+    /// Soma o áudio desta pessoa em `out`, multiplicado por `gain`.
+    fn mix_into(&mut self, out: &mut [f32], gain: f32) {
         if !self.playing {
             if self.queue.len() < PREBUFFER {
                 return;
@@ -134,7 +134,7 @@ impl PeerRx {
         }
         let n = out.len().min(self.queue.len());
         for (o, s) in out.iter_mut().zip(self.queue.drain(..n)) {
-            *o += s;
+            *o += s * gain;
         }
         if self.queue.is_empty() {
             self.playing = false;
@@ -148,6 +148,11 @@ struct Shared {
     deafened: AtomicBool,
     speaking: AtomicBool,
     stop: AtomicBool,
+    /// Volume de cada pessoa (1.0 = normal). Fica fora de `peers` para valer
+    /// antes do primeiro pacote e depois que a pessoa sai e volta.
+    gains: Mutex<HashMap<PeerId, f32>>,
+    /// Volume do meu microfone, em bits de f32.
+    mic_gain: AtomicU32,
     /// Som de aviso que ainda falta tocar (a 48 kHz).
     cue: Mutex<VecDeque<f32>>,
 }
@@ -168,6 +173,8 @@ impl Engine {
             deafened: AtomicBool::new(false),
             speaking: AtomicBool::new(false),
             stop: AtomicBool::new(false),
+            gains: Mutex::new(HashMap::new()),
+            mic_gain: AtomicU32::new(1f32.to_bits()),
             cue: Mutex::new(VecDeque::new()),
         });
         let (ready_tx, ready_rx) = mpsc::channel();
@@ -206,6 +213,16 @@ impl Engine {
         let mut q = self.shared.cue.lock().unwrap();
         q.clear();
         q.extend(cue_samples(cue));
+    }
+
+    /// Volume de uma pessoa, de 0.0 (mudo) a 2.0 (dobro).
+    pub fn set_peer_volume(&self, peer: PeerId, volume: f32) {
+        self.shared.gains.lock().unwrap().insert(peer, volume.clamp(0.0, 2.0));
+    }
+
+    /// Volume do meu microfone, de 0.0 a 2.0.
+    pub fn set_mic_volume(&self, volume: f32) {
+        self.shared.mic_gain.store(volume.clamp(0.0, 2.0).to_bits(), Ordering::Relaxed);
     }
 
     pub fn set_muted(&self, on: bool) {
@@ -273,6 +290,13 @@ fn audio_thread(
             if shared.muted.load(Ordering::Relaxed) {
                 open_for = 0;
                 continue;
+            }
+            // Volume do microfone antes do gate: baixar o volume também fecha o gate mais cedo.
+            let gain = f32::from_bits(shared.mic_gain.load(Ordering::Relaxed));
+            if gain != 1.0 {
+                for s in frame.iter_mut() {
+                    *s = (*s * gain).clamp(-1.0, 1.0);
+                }
             }
             let rms = (frame.iter().map(|s| s * s).sum::<f32>() / FRAME as f32).sqrt();
             if rms > GATE {
@@ -364,8 +388,11 @@ where
             let frames = data.len() / ch;
             while fifo.len() < frames {
                 mix.fill(0.0);
-                for rx in shared.peers.lock().unwrap().values_mut() {
-                    rx.mix_into(&mut mix);
+                {
+                    let gains = shared.gains.lock().unwrap();
+                    for (id, rx) in shared.peers.lock().unwrap().iter_mut() {
+                        rx.mix_into(&mut mix, gains.get(id).copied().unwrap_or(1.0));
+                    }
                 }
                 if shared.deafened.load(Ordering::Relaxed) {
                     mix.fill(0.0);
@@ -421,8 +448,26 @@ mod tests {
         assert_eq!(rx.queue.len(), FRAME * 4);
 
         let mut out = [0f32; FRAME];
-        rx.mix_into(&mut out);
+        rx.mix_into(&mut out, 1.0);
         assert!(rx.playing);
         assert_eq!(rx.queue.len(), FRAME * 3);
+    }
+
+    #[test]
+    fn volume_da_pessoa_multiplica_o_audio() {
+        let mut enc = Encoder::new(BITRATE).unwrap();
+        let p = packet(&mut enc, 0);
+        let (mut a, mut b) = (PeerRx::new().unwrap(), PeerRx::new().unwrap());
+        for rx in [&mut a, &mut b] {
+            rx.push(0, &p[2..]);
+            rx.push(1, &p[2..]);
+        }
+        let (mut normal, mut metade) = ([0f32; FRAME], [0f32; FRAME]);
+        a.mix_into(&mut normal, 1.0);
+        b.mix_into(&mut metade, 0.5);
+        for (n, m) in normal.iter().zip(&metade) {
+            assert!((n * 0.5 - m).abs() < 1e-6);
+        }
+        assert!(normal.iter().any(|s| s.abs() > 0.01), "o teste precisa de áudio de verdade");
     }
 }

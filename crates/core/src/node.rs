@@ -76,6 +76,7 @@ impl Node {
             .profile(key.public().as_bytes())?
             .unwrap_or_else(|| format!("user-{}", key.public().fmt_short()));
 
+        let voice = VoiceState::new(store.volumes()?, store.setting("mic_volume")?);
         let lookup = MemoryLookup::new();
         let endpoint = Endpoint::builder(presets::N0)
             .secret_key(key.clone())
@@ -90,7 +91,7 @@ impl Node {
             name: Mutex::new(name),
             senders: Mutex::new(HashMap::new()),
             events,
-            voice: Mutex::new(VoiceState::default()),
+            voice: Mutex::new(voice),
         });
         let router = Router::builder(endpoint.clone())
             .accept(GOSSIP_ALPN, gossip.clone())
@@ -208,6 +209,16 @@ impl Node {
 
     pub fn voice_connections(&self) -> usize {
         self.shared.voice_connections()
+    }
+
+    /// Volume de uma pessoa na voz (0.0 a 2.0), salvo para as próximas chamadas.
+    pub fn set_user_volume(&self, key: [u8; 32], volume: f32) -> Result<()> {
+        self.shared.set_user_volume(key, volume)
+    }
+
+    /// Volume do meu microfone (0.0 a 2.0), salvo para as próximas chamadas.
+    pub fn set_mic_volume(&self, volume: f32) -> Result<()> {
+        self.shared.set_mic_volume(volume)
     }
 
     pub fn set_muted(&self, on: bool) {

@@ -42,7 +42,11 @@ impl Store {
                  raw BLOB NOT NULL);
              CREATE INDEX IF NOT EXISTS messages_by_chan ON messages(topic, channel, ts);
              CREATE TABLE IF NOT EXISTS members(
-                 topic BLOB NOT NULL, key BLOB NOT NULL, PRIMARY KEY(topic, key));",
+                 topic BLOB NOT NULL, key BLOB NOT NULL, PRIMARY KEY(topic, key));
+             CREATE TABLE IF NOT EXISTS volumes(
+                 key BLOB PRIMARY KEY, volume REAL NOT NULL);
+             CREATE TABLE IF NOT EXISTS settings(
+                 name TEXT PRIMARY KEY, value REAL NOT NULL);",
         )?;
         Ok(Self { db })
     }
@@ -93,6 +97,39 @@ impl Store {
             .db
             .query_row("SELECT name FROM profiles WHERE key = ?1", [key], |r| r.get(0))
             .optional()?)
+    }
+
+    /// Volume que eu escolhi para uma pessoa (só vale aqui, não vai para a rede).
+    pub fn set_volume(&self, key: &[u8; 32], volume: f32) -> Result<()> {
+        self.db.execute(
+            "INSERT INTO volumes(key, volume) VALUES (?1, ?2)
+             ON CONFLICT(key) DO UPDATE SET volume = excluded.volume",
+            params![key, volume as f64],
+        )?;
+        Ok(())
+    }
+
+    pub fn volumes(&self) -> Result<Vec<([u8; 32], f32)>> {
+        let mut st = self.db.prepare("SELECT key, volume FROM volumes")?;
+        let rows = st.query_map([], |r| Ok((r.get(0)?, r.get::<_, f64>(1)? as f32)))?;
+        Ok(rows.collect::<Result<_, _>>()?)
+    }
+
+    pub fn set_setting(&self, name: &str, value: f32) -> Result<()> {
+        self.db.execute(
+            "INSERT INTO settings(name, value) VALUES (?1, ?2)
+             ON CONFLICT(name) DO UPDATE SET value = excluded.value",
+            params![name, value as f64],
+        )?;
+        Ok(())
+    }
+
+    pub fn setting(&self, name: &str) -> Result<Option<f32>> {
+        Ok(self
+            .db
+            .query_row("SELECT value FROM settings WHERE name = ?1", [name], |r| r.get::<_, f64>(0))
+            .optional()?
+            .map(|v| v as f32))
     }
 
     /// Guarda uma mensagem de chat. Retorna `false` se ela já existia.
@@ -148,5 +185,26 @@ impl Store {
             Ok(Bytes::from(r.get::<_, Vec<u8>>(0)?))
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn volumes_e_ajustes_sobrevivem_reabrir() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("t.db");
+        {
+            let s = Store::open(&path).unwrap();
+            s.set_volume(&[1; 32], 0.5).unwrap();
+            s.set_volume(&[1; 32], 1.5).unwrap();
+            s.set_setting("mic_volume", 0.8).unwrap();
+        }
+        let s = Store::open(&path).unwrap();
+        assert_eq!(s.volumes().unwrap(), vec![([1; 32], 1.5)]);
+        assert_eq!(s.setting("mic_volume").unwrap(), Some(0.8));
+        assert_eq!(s.setting("outro").unwrap(), None);
     }
 }

@@ -29,11 +29,15 @@ const EXPIRE: Duration = Duration::from_secs(30);
 
 type Conns = Arc<Mutex<HashMap<PublicKey, Connection>>>;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct VoiceMember {
+    /// Chave pública da pessoa.
+    pub id: [u8; 32],
     pub name: String,
     pub speaking: bool,
     pub me: bool,
+    /// Volume que eu escolhi para ela (no meu caso, o do microfone). 1.0 = normal.
+    pub volume: f32,
 }
 
 struct Session {
@@ -57,6 +61,16 @@ pub struct VoiceState {
     session: Option<Session>,
     /// Quem anunciou estar na voz, por servidor, e quando foi o último anúncio.
     members: HashMap<TopicId, HashMap<PublicKey, Instant>>,
+    /// Volume escolhido para cada pessoa; quem não está aqui fica em 1.0.
+    volumes: HashMap<[u8; 32], f32>,
+    /// Volume do meu microfone (None = 1.0).
+    mic_volume: Option<f32>,
+}
+
+impl VoiceState {
+    pub(crate) fn new(volumes: Vec<([u8; 32], f32)>, mic_volume: Option<f32>) -> Self {
+        Self { volumes: volumes.into_iter().collect(), mic_volume, ..Default::default() }
+    }
 }
 
 impl Shared {
@@ -81,6 +95,10 @@ impl Shared {
         engine.play_cue(Cue::Join);
         let peers: Vec<PublicKey> = {
             let mut v = self.voice.lock().unwrap();
+            for (k, vol) in &v.volumes {
+                engine.set_peer_volume(*k, *vol);
+            }
+            engine.set_mic_volume(v.mic_volume.unwrap_or(1.0));
             let me = self.key.public();
             let now = Instant::now();
             // Quem já estava lá não toca som; só quem entrar depois.
@@ -129,6 +147,28 @@ impl Shared {
     pub(crate) fn voice_connections(&self) -> usize {
         let v = self.voice.lock().unwrap();
         v.session.as_ref().map_or(0, |s| s.conns.lock().unwrap().len())
+    }
+
+    pub(crate) fn set_user_volume(&self, key: [u8; 32], volume: f32) -> Result<()> {
+        let volume = volume.clamp(0.0, 2.0);
+        let mut v = self.voice.lock().unwrap();
+        v.volumes.insert(key, volume);
+        if let Some(s) = &v.session {
+            s.engine.set_peer_volume(key, volume);
+        }
+        drop(v);
+        self.store.lock().unwrap().set_volume(&key, volume)
+    }
+
+    pub(crate) fn set_mic_volume(&self, volume: f32) -> Result<()> {
+        let volume = volume.clamp(0.0, 2.0);
+        let mut v = self.voice.lock().unwrap();
+        v.mic_volume = Some(volume);
+        if let Some(s) = &v.session {
+            s.engine.set_mic_volume(volume);
+        }
+        drop(v);
+        self.store.lock().unwrap().set_setting("mic_volume", volume)
     }
 
     pub(crate) fn set_muted(&self, on: bool) {
@@ -245,7 +285,7 @@ impl Shared {
             m.retain(|k, seen| *k != me && now - *seen < EXPIRE);
         }
         // Som de entrou/saiu: compara quem está agora com o último snapshot.
-        let VoiceState { session, members } = &mut *v;
+        let VoiceState { session, members, .. } = &mut *v;
         if let Some(s) = session {
             let current: HashSet<PublicKey> =
                 members.get(&s.topic).map(|m| m.keys().copied().collect()).unwrap_or_default();
@@ -269,6 +309,8 @@ impl Shared {
             let list = out.entry(*topic).or_default();
             for k in members.keys() {
                 list.push(VoiceMember {
+                    id: *k.as_bytes(),
+                    volume: v.volumes.get(k.as_bytes()).copied().unwrap_or(1.0),
                     name: crate::node::display_name(&store, k.as_bytes()),
                     speaking: my_topic == Some(*topic) && speaking.contains(k.as_bytes()),
                     me: false,
@@ -278,7 +320,13 @@ impl Shared {
         if let Some(t) = my_topic {
             out.entry(t).or_default().insert(
                 0,
-                VoiceMember { name: self.name.lock().unwrap().clone(), speaking: me_speaking, me: true },
+                VoiceMember {
+                    id: *me.as_bytes(),
+                    name: self.name.lock().unwrap().clone(),
+                    speaking: me_speaking,
+                    me: true,
+                    volume: v.mic_volume.unwrap_or(1.0),
+                },
             );
         }
         for list in out.values_mut() {

@@ -1,4 +1,4 @@
-import { LineEdit, ListView } from "std-widgets.slint";
+import { LineEdit, ListView, Slider } from "std-widgets.slint";
 
 export global Theme {
     out property <color> rail: #111214;
@@ -42,6 +42,8 @@ export struct MsgItem {
 }
 
 export struct VoiceItem {
+    // Chave pública em hex (para mudar o volume).
+    id: string,
     name: string,
     initial: string,
     color: color,
@@ -49,6 +51,8 @@ export struct VoiceItem {
     me: bool,
     muted: bool,
     deafened: bool,
+    // Volume que eu escolhi para a pessoa, em % (no meu caso, o do microfone).
+    volume: int,
 }
 
 // ---------------------------------------------------------------- Ícones
@@ -217,10 +221,17 @@ component Avatar inherits Rectangle {
 
 component VoiceUser inherits Rectangle {
     in property <VoiceItem> user;
+    callback clicked;
     height: 32px;
     border-radius: 4px;
     background: ta.has-hover ? Theme.hover : transparent;
-    ta := TouchArea { }
+    accessible-role: button;
+    accessible-label: (user.me ? "Volume do microfone" : "Volume de " + user.name);
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
     HorizontalLayout {
         padding-left: 28px;
         padding-right: 6px;
@@ -242,6 +253,13 @@ component VoiceUser inherits Rectangle {
             font-weight: user.speaking ? 600 : 400;
             vertical-alignment: center;
             overflow: elide;
+        }
+        // Volume fora do normal aparece ao lado do nome.
+        if user.volume != 100: Text {
+            text: user.volume + "%";
+            color: user.volume == 0 ? Theme.danger : Theme.muted;
+            font-size: 11px;
+            vertical-alignment: center;
         }
         if user.muted && !user.deafened: Rectangle {
             width: 16px;
@@ -459,7 +477,7 @@ export component AppWindow inherits Window {
     in-out property <string> invite-text;
     // Erro passageiro mostrado em cima do chat.
     in-out property <string> toast;
-    // "", "add", "invite", "profile", "welcome", "update"
+    // "", "add", "invite", "profile", "welcome", "update", "volume"
     in-out property <string> dialog;
     // Mensagens que chegaram enquanto a pessoa lia lá em cima.
     in-out property <int> unseen;
@@ -499,6 +517,12 @@ export component AppWindow inherits Window {
     callback set-muted(bool);
     callback set-deafened(bool);
     callback install-update();
+    // Volume de alguém da voz (id em hex, se sou eu, em %).
+    callback set-volume(string, bool, int);
+    property <string> vol-id;
+    property <string> vol-name;
+    property <bool> vol-me;
+    property <int> vol-value;
     // Põe o cursor na caixa de mensagem (ao abrir um servidor).
     callback focus-composer();
     focus-composer => {
@@ -636,7 +660,16 @@ export component AppWindow inherits Window {
                         hint: voice-here ? "" : "Entrar";
                         clicked => { if !voice-here { root.join-voice(); } }
                     }
-                    for u in voice-members: VoiceUser { user: u; }
+                    for u in voice-members: VoiceUser {
+                        user: u;
+                        clicked => {
+                            root.vol-id = u.id;
+                            root.vol-name = u.name;
+                            root.vol-me = u.me;
+                            root.vol-value = u.volume;
+                            root.dialog = "volume";
+                        }
+                    }
                 }
                 Rectangle { vertical-stretch: 1; }
 
@@ -1058,6 +1091,46 @@ export component AppWindow inherits Window {
                         HorizontalLayout {
                             alignment: end;
                             Btn { text: "Fechar"; clicked => { root.close-dialog(); } }
+                        }
+                    }
+
+                    if dialog == "volume": VerticalLayout {
+                        spacing: 10px;
+                        DialogTitle { text: vol-me ? "Volume do microfone" : "Volume de " + vol-name; }
+                        DialogText {
+                            text: vol-me
+                                ? "Muda o quanto os outros te ouvem."
+                                : "Só muda para você; " + vol-name + " não fica sabendo.";
+                        }
+                        HorizontalLayout {
+                            spacing: 12px;
+                            Slider {
+                                horizontal-stretch: 1;
+                                minimum: 0;
+                                maximum: 200;
+                                value: vol-value;
+                                changed(v) => {
+                                    root.vol-value = round(v);
+                                    root.set-volume(vol-id, vol-me, root.vol-value);
+                                }
+                            }
+                            Text {
+                                width: 44px;
+                                text: vol-value + "%";
+                                color: Theme.text;
+                                horizontal-alignment: right;
+                                vertical-alignment: center;
+                            }
+                        }
+                        HorizontalLayout {
+                            alignment: end;
+                            spacing: 8px;
+                            Btn {
+                                text: "Voltar para 100%";
+                                enabled: vol-value != 100;
+                                clicked => { root.vol-value = 100; root.set-volume(vol-id, vol-me, 100); }
+                            }
+                            Btn { text: "Fechar"; primary: true; clicked => { root.close-dialog(); } }
                         }
                     }
 
