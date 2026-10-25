@@ -4663,7 +4663,7 @@ dependencies = [
 
 [[package]]
 name = "p2pcord"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4679,7 +4679,7 @@ dependencies = [
 
 [[package]]
 name = "p2pcord-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "blake3",
@@ -4699,7 +4699,7 @@ dependencies = [
 
 [[package]]
 name = "p2pcord-release"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "p2pcord-core",
@@ -4707,7 +4707,7 @@ dependencies = [
 
 [[package]]
 name = "p2pcord-voice"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "cpal",

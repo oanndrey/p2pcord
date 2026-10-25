@@ -3,8 +3,10 @@
 #
 # Antes: suba o `version` em Cargo.toml ([workspace.package]).
 # Uso:   .\scripts\release.ps1
+#
+# Sem $ErrorActionPreference = 'Stop': no PowerShell 5.1 o stderr do cargo e do gh
+# (progresso, "release not found") vira erro fatal. Cada passo confere $LASTEXITCODE.
 
-$ErrorActionPreference = 'Stop'
 Set-Location (Join-Path $PSScriptRoot '..')
 
 $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.+)"').Matches[0].Groups[1].Value
@@ -12,7 +14,8 @@ $repo = (Select-String -Path app\src\update.rs -Pattern '^const REPO: &str = "(.
 if (-not $repo) { throw 'REPO está vazio em app\src\update.rs' }
 
 gh release view "v$version" --repo $repo 2>$null | Out-Null
-if ($LASTEXITCODE -eq 0) { throw "a v$version já foi publicada; suba a versão no Cargo.toml" }
+$exists = $LASTEXITCODE -eq 0
+if ($exists) { throw "a v$version já foi publicada; suba a versão no Cargo.toml" }
 
 cargo build --release -p p2pcord
 if ($LASTEXITCODE) { throw 'build falhou' }
