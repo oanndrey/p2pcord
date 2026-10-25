@@ -1,0 +1,20 @@
+[package]
+name = "p2pcord"
+version.workspace = true
+edition.workspace = true
+
+[build-dependencies]
+slint-build = "1"
+
+[dependencies]
+slint = { version = "1", default-features = false, features = ["std", "compat-1-2", "backend-winit", "renderer-software", "software-renderer-path", "accessibility"] }
+p2pcord-core.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# Atualização automática. Tudo isso já entra no binário pelo iroh (mesmas versões e
+# features, TLS com ring e certificados do webpki-roots), então quase não pesa.
+reqwest = { version = "0.13", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
+webpki-roots = "1"
+serde_json = "1"

@@ -1,0 +1,22 @@
+[package]
+name = "p2pcord-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+iroh.workspace = true
+iroh-gossip.workspace = true
+tokio.workspace = true
+serde.workspace = true
+postcard.workspace = true
+anyhow.workspace = true
+rusqlite.workspace = true
+bytes = "1"
+blake3 = "1"
+data-encoding = "2"
+n0-future = "0.3"
+serde_bytes = "0.11"
+p2pcord-voice = { path = "../voice" }
+
+[dev-dependencies]
+tempfile = "3"

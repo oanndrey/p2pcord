@@ -1,0 +1,9 @@
+﻿[package]
+name = "p2pcord-release"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+p2pcord-core.workspace = true
+anyhow.workspace = true

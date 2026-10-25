@@ -1,0 +1,1137 @@
+import { LineEdit, ListView } from "std-widgets.slint";
+
+export global Theme {
+    out property <color> rail: #111214;
+    out property <color> side: #1a1b1e;
+    out property <color> panel: #151618;
+    out property <color> main: #222327;
+    out property <color> input: #2c2d32;
+    out property <color> hover: #2b2d31;
+    out property <color> hover-strong: #35373c;
+    out property <color> line: #111214;
+    out property <color> text: #e6e6e8;
+    out property <color> body: #d4d5d8;
+    out property <color> muted: #8b8d94;
+    out property <color> accent: #5865f2;
+    out property <color> accent-hover: #4752c4;
+    out property <color> online: #23a55a;
+    out property <color> warn: #f0b232;
+    out property <color> danger: #da373c;
+    out property <color> danger-hover: #a12d2f;
+}
+
+export struct ServerItem {
+    name: string,
+    initials: string,
+    unread: bool,
+}
+
+export struct MsgItem {
+    author: string,
+    initial: string,
+    color: color,
+    text: string,
+    // Hora curta (HH:MM), mostrada ao passar o mouse nas mensagens agrupadas.
+    time: string,
+    // Data completa do cabeçalho ("Hoje às 11:42").
+    stamp: string,
+    // Primeira mensagem de um grupo: mostra avatar, nome e data.
+    head: bool,
+    // Separador de dia antes da mensagem ("" quando não muda o dia).
+    day: string,
+}
+
+export struct VoiceItem {
+    name: string,
+    initial: string,
+    color: color,
+    speaking: bool,
+    me: bool,
+    muted: bool,
+    deafened: bool,
+}
+
+// ---------------------------------------------------------------- Ícones
+// Traços em 24x24 (estilo Lucide), desenhados como Path: nada de imagem embutida.
+
+component Icon inherits Path {
+    in property <color> tint: Theme.text;
+    width: 20px;
+    height: 20px;
+    viewbox-width: 24;
+    viewbox-height: 24;
+    stroke: root.tint;
+    stroke-width: 2px;
+    stroke-line-cap: round;
+    stroke-line-join: round;
+    fill: transparent;
+}
+
+component MicIcon inherits Icon {
+    commands: "M12 2 a3 3 0 0 0 -3 3 v7 a3 3 0 0 0 6 0 V5 a3 3 0 0 0 -3 -3 Z M19 10 v2 a7 7 0 0 1 -14 0 v-2 M12 19 v3";
+}
+
+component HeadphonesIcon inherits Icon {
+    commands: "M3 14 h3 a2 2 0 0 1 2 2 v3 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 v-7 a9 9 0 0 1 18 0 v7 a2 2 0 0 1 -2 2 h-1 a2 2 0 0 1 -2 -2 v-3 a2 2 0 0 1 2 -2 h3";
+}
+
+component SlashIcon inherits Icon {
+    commands: "M3 3 L21 21";
+}
+
+component GearIcon inherits Icon {
+    commands: "M12.22 2 h-0.44 a2 2 0 0 0 -2 2 v0.18 a2 2 0 0 1 -1 1.73 l-0.43 0.25 a2 2 0 0 1 -2 0 l-0.15 -0.08 a2 2 0 0 0 -2.73 0.73 l-0.22 0.38 a2 2 0 0 0 0.73 2.73 l0.15 0.1 a2 2 0 0 1 1 1.72 v0.51 a2 2 0 0 1 -1 1.74 l-0.15 0.09 a2 2 0 0 0 -0.73 2.73 l0.22 0.38 a2 2 0 0 0 2.73 0.73 l0.15 -0.08 a2 2 0 0 1 2 0 l0.43 0.25 a2 2 0 0 1 1 1.73 V20 a2 2 0 0 0 2 2 h0.44 a2 2 0 0 0 2 -2 v-0.18 a2 2 0 0 1 1 -1.73 l0.43 -0.25 a2 2 0 0 1 2 0 l0.15 0.08 a2 2 0 0 0 2.73 -0.73 l0.22 -0.39 a2 2 0 0 0 -0.73 -2.73 l-0.15 -0.08 a2 2 0 0 1 -1 -1.74 v-0.5 a2 2 0 0 1 1 -1.74 l0.15 -0.09 a2 2 0 0 0 0.73 -2.73 l-0.22 -0.38 a2 2 0 0 0 -2.73 -0.73 l-0.15 0.08 a2 2 0 0 1 -2 0 l-0.43 -0.25 a2 2 0 0 1 -1 -1.73 V4 a2 2 0 0 0 -2 -2 Z M15 12 a3 3 0 1 1 -6 0 a3 3 0 1 1 6 0 Z";
+}
+
+// Telefone deitado (desligar), preenchido.
+component HangUpIcon inherits Icon {
+    stroke-width: 0px;
+    fill: root.tint;
+    commands: "M12 9 c-1.6 0 -3.15 0.25 -4.6 0.72 v3.1 c0 0.39 -0.23 0.74 -0.56 0.9 c-0.98 0.49 -1.87 1.12 -2.66 1.85 c-0.18 0.18 -0.43 0.28 -0.7 0.28 c-0.28 0 -0.53 -0.11 -0.71 -0.29 L0.29 13.08 c-0.18 -0.17 -0.29 -0.42 -0.29 -0.7 c0 -0.28 0.11 -0.53 0.29 -0.71 C3.34 8.78 7.46 7 12 7 s8.66 1.78 11.71 4.67 c0.18 0.18 0.29 0.43 0.29 0.71 c0 0.28 -0.11 0.53 -0.29 0.71 l-2.48 2.48 c-0.18 0.18 -0.43 0.29 -0.71 0.29 c-0.27 0 -0.52 -0.11 -0.7 -0.28 c-0.79 -0.74 -1.69 -1.36 -2.67 -1.85 c-0.33 -0.16 -0.56 -0.5 -0.56 -0.9 v-3.1 C15.15 9.25 13.6 9 12 9 Z";
+}
+
+component SpeakerIcon inherits Icon {
+    commands: "M11 5 L6 9 H2 v6 h4 l5 4 V5 Z M15.54 8.46 a5 5 0 0 1 0 7.07 M19.07 4.93 a10 10 0 0 1 0 14.14";
+}
+
+component HashIcon inherits Icon {
+    commands: "M4 9 h16 M4 15 h16 M10 3 L8 21 M16 3 L14 21";
+}
+
+component UserPlusIcon inherits Icon {
+    commands: "M16 21 v-2 a4 4 0 0 0 -4 -4 H6 a4 4 0 0 0 -4 4 v2 M13 7 a4 4 0 1 1 -8 0 a4 4 0 1 1 8 0 Z M19 8 v6 M22 11 h-6";
+}
+
+component PlusIcon inherits Icon {
+    commands: "M12 5 v14 M5 12 h14";
+}
+
+component ArrowDownIcon inherits Icon {
+    commands: "M12 5 v14 M19 12 l-7 7 l-7 -7";
+}
+
+component DownloadIcon inherits Icon {
+    commands: "M21 15 v4 a2 2 0 0 1 -2 2 H5 a2 2 0 0 1 -2 -2 v-4 M7 10 l5 5 l5 -5 M12 15 V3";
+}
+
+// ---------------------------------------------------------------- Peças
+
+// Dica que aparece depois de meio segundo com o mouse em cima.
+component Tooltip inherits Rectangle {
+    in property <string> text;
+    width: label.preferred-width + 16px;
+    height: 26px;
+    border-radius: 4px;
+    background: #0b0c0d;
+    label := Text { text: root.text; color: Theme.text; font-size: 12px; }
+}
+
+component IconButton inherits Rectangle {
+    // Recurso desligado (microfone/som cortado): fundo e ícone vermelhos.
+    in property <bool> off;
+    // Ação destrutiva (sair da chamada).
+    in property <bool> danger;
+    in property <string> tip;
+    in property <bool> tip-below;
+    in property <length> size: 32px;
+    callback clicked;
+    property <bool> show-tip;
+    width: size;
+    height: size;
+    border-radius: 6px;
+    background: danger ? (ta.has-hover ? Theme.danger-hover : Theme.danger)
+        : off ? (ta.has-hover ? #5a2a2d : #43262a)
+        : ta.pressed ? #404249 : ta.has-hover ? Theme.hover-strong : transparent;
+    animate background { duration: 100ms; }
+    accessible-role: button;
+    accessible-label: tip;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+        changed has-hover => { if !self.has-hover { root.show-tip = false; } }
+    }
+    Timer {
+        interval: 500ms;
+        running: ta.has-hover && !root.show-tip;
+        triggered => { root.show-tip = true; }
+    }
+    @children
+    if show-tip && tip != "": Tooltip {
+        text: tip;
+        x: (root.width - self.width) / 2;
+        y: tip-below ? root.height + 6px : -self.height - 6px;
+    }
+}
+
+component Btn inherits Rectangle {
+    in property <string> text;
+    in property <bool> primary;
+    in property <bool> enabled: true;
+    callback clicked;
+    height: 36px;
+    min-width: label.preferred-width + 32px;
+    border-radius: 4px;
+    background: !enabled ? #3a3c42
+        : primary ? (ta.has-hover ? Theme.accent-hover : Theme.accent)
+        : ta.has-hover ? #4e5058 : #43454b;
+    opacity: enabled ? 1 : 0.6;
+    accessible-role: button;
+    accessible-label: text;
+    accessible-action-default => { if enabled { root.clicked(); } }
+    ta := TouchArea {
+        enabled: root.enabled;
+        mouse-cursor: root.enabled ? pointer : default;
+        clicked => { root.clicked(); }
+    }
+    label := Text { text: root.text; color: Theme.text; font-size: 14px; font-weight: 500; }
+}
+
+// Avatar redondo com a inicial. Enquanto a pessoa fala aparece um anel verde
+// por fora, sem mudar o tamanho do avatar (a linha não pula).
+component Avatar inherits Rectangle {
+    in property <string> initial;
+    in property <color> tint;
+    in property <length> size: 32px;
+    in property <bool> speaking;
+    width: size;
+    height: size;
+    if speaking: Rectangle {
+        width: root.size + 6px;
+        height: self.width;
+        border-radius: self.width / 2;
+        border-width: 2px;
+        border-color: Theme.online;
+    }
+    Rectangle {
+        border-radius: root.size / 2;
+        background: root.tint;
+        Text {
+            text: root.initial;
+            color: white;
+            font-size: root.size * 0.42;
+            font-weight: 600;
+        }
+    }
+}
+
+component VoiceUser inherits Rectangle {
+    in property <VoiceItem> user;
+    height: 32px;
+    border-radius: 4px;
+    background: ta.has-hover ? Theme.hover : transparent;
+    ta := TouchArea { }
+    HorizontalLayout {
+        padding-left: 28px;
+        padding-right: 6px;
+        spacing: 8px;
+        VerticalLayout {
+            alignment: center;
+            Avatar {
+                size: 24px;
+                initial: user.initial;
+                tint: user.color;
+                speaking: user.speaking;
+            }
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: user.name + (user.me ? " (você)" : "");
+            color: user.speaking ? Theme.text : Theme.muted;
+            font-size: 13px;
+            font-weight: user.speaking ? 600 : 400;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if user.muted && !user.deafened: Rectangle {
+            width: 16px;
+            accessible-role: image;
+            accessible-label: "microfone desligado";
+            MicIcon { width: 15px; height: 15px; tint: Theme.danger; }
+            SlashIcon { width: 15px; height: 15px; tint: Theme.danger; }
+        }
+        if user.deafened: Rectangle {
+            width: 16px;
+            accessible-role: image;
+            accessible-label: "som desligado";
+            HeadphonesIcon { width: 15px; height: 15px; tint: Theme.danger; }
+            SlashIcon { width: 15px; height: 15px; tint: Theme.danger; }
+        }
+    }
+}
+
+component ServerIcon inherits Rectangle {
+    in property <string> initials;
+    in property <string> name;
+    in property <bool> selected;
+    in property <bool> unread;
+    in property <bool> add;
+    // Botão verde de baixar a versão nova.
+    in property <bool> update;
+    callback clicked;
+    width: 72px;
+    height: 48px;
+    accessible-role: button;
+    accessible-label: name;
+    accessible-action-default => { root.clicked(); }
+    // Pílula branca à esquerda: alta no selecionado, ponto quando tem mensagem nova.
+    Rectangle {
+        x: -4px;
+        width: 8px;
+        height: selected ? 40px : ta.has-hover ? 20px : unread ? 8px : 0px;
+        border-radius: 4px;
+        background: Theme.text;
+        animate height { duration: 120ms; }
+    }
+    Rectangle {
+        width: 48px;
+        height: 48px;
+        border-radius: selected || ta.has-hover ? 16px : 24px;
+        background: selected ? Theme.accent
+            : update ? (ta.has-hover ? #1a8045 : Theme.online)
+            : add && ta.has-hover ? Theme.online
+            : ta.has-hover ? Theme.accent : Theme.hover;
+        animate border-radius, background { duration: 120ms; }
+        if !add && !update: Text {
+            text: initials;
+            color: Theme.text;
+            font-size: 16px;
+            font-weight: 600;
+        }
+        if add: PlusIcon { tint: ta.has-hover ? white : Theme.online; }
+        if update: DownloadIcon { tint: white; }
+    }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+}
+
+component ChannelRow inherits Rectangle {
+    in property <string> label;
+    in property <bool> voice;
+    in property <bool> selected;
+    in property <string> hint;
+    callback clicked;
+    height: 32px;
+    border-radius: 4px;
+    background: selected ? Theme.hover-strong : ta.has-hover ? Theme.hover : transparent;
+    accessible-role: button;
+    accessible-label: label;
+    accessible-action-default => { root.clicked(); }
+    ta := TouchArea {
+        mouse-cursor: pointer;
+        clicked => { root.clicked(); }
+    }
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 6px;
+        Rectangle {
+            width: 20px;
+            if !voice: HashIcon { width: 18px; height: 18px; tint: Theme.muted; }
+            if voice: SpeakerIcon { width: 18px; height: 18px; tint: Theme.muted; }
+        }
+        Text {
+            horizontal-stretch: 1;
+            text: label;
+            color: selected || ta.has-hover ? Theme.text : Theme.muted;
+            font-size: 14px;
+            font-weight: selected ? 600 : 400;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if ta.has-hover && hint != "": Text {
+            text: hint;
+            color: Theme.muted;
+            font-size: 12px;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// Uma mensagem. A altura vem só do layout (nada aparece ou some no hover), e o
+// fundo de hover cobre só a mensagem: o separador de dia e o respiro acima do
+// grupo ficam de fora.
+component MessageRow inherits Rectangle {
+    in property <MsgItem> m;
+    // Última da lista: ganha um respiro antes da caixa de digitação.
+    in property <bool> last;
+    height: lay.preferred-height;
+    lay := VerticalLayout {
+        if m.day != "": HorizontalLayout {
+            height: 36px;
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 12px;
+            spacing: 8px;
+            VerticalLayout { horizontal-stretch: 1; alignment: center; Rectangle { height: 1px; background: #3a3c42; } }
+            Text { text: m.day; color: Theme.muted; font-size: 12px; font-weight: 600; vertical-alignment: center; }
+            VerticalLayout { horizontal-stretch: 1; alignment: center; Rectangle { height: 1px; background: #3a3c42; } }
+        }
+        Rectangle { height: m.head ? 10px : 0px; }
+        Rectangle {
+            background: ta.has-hover ? #1e1f22 : transparent;
+            ta := TouchArea { }
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                padding-top: m.head ? 4px : 2px;
+                padding-bottom: 2px;
+                spacing: 14px;
+                // Coluna do avatar: no começo do grupo o avatar, nas seguintes a hora (só no hover).
+                Rectangle {
+                    width: 40px;
+                    // O avatar nunca fica cortado, mesmo numa mensagem de uma linha.
+                    min-height: m.head ? 40px : 0px;
+                    if m.head: Avatar {
+                        y: 2px;
+                        size: 40px;
+                        initial: m.initial;
+                        tint: m.color;
+                    }
+                    Text {
+                        visible: !m.head && ta.has-hover;
+                        y: 4px;
+                        width: parent.width;
+                        horizontal-alignment: right;
+                        text: m.time;
+                        color: Theme.muted;
+                        font-size: 10px;
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+                    if m.head: HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        Text { text: m.author; color: Theme.text; font-weight: 600; overflow: elide; }
+                        Text { text: m.stamp; color: Theme.muted; font-size: 11px; vertical-alignment: center; }
+                    }
+                    Text { text: m.text; color: Theme.body; wrap: word-wrap; }
+                }
+            }
+        }
+        Rectangle { height: last ? 14px : 0px; }
+    }
+}
+
+component DialogTitle inherits Text {
+    color: Theme.text;
+    font-size: 20px;
+    font-weight: 700;
+    wrap: word-wrap;
+}
+
+component DialogText inherits Text {
+    color: Theme.muted;
+    font-size: 13px;
+    wrap: word-wrap;
+}
+
+component FieldLabel inherits Text {
+    color: Theme.muted;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+// ---------------------------------------------------------------- Janela
+
+export component AppWindow inherits Window {
+    title: current-server >= 0 ? "#geral · " + servers[current-server].name + " — p2pcord" : "p2pcord";
+    preferred-width: 1100px;
+    preferred-height: 680px;
+    min-width: 760px;
+    min-height: 460px;
+    background: Theme.main;
+    default-font-size: 14px;
+
+    in property <[ServerItem]> servers;
+    in-out property <int> current-server: -1;
+    in property <[MsgItem]> messages;
+    in property <int> online;
+    in property <string> my-name;
+    in property <string> my-initial;
+    in property <color> my-color: Theme.accent;
+    in property <string> my-id;
+    in property <string> status;
+    in-out property <string> invite-text;
+    // Erro passageiro mostrado em cima do chat.
+    in-out property <string> toast;
+    // "", "add", "invite", "profile", "welcome", "update"
+    in-out property <string> dialog;
+    // Mensagens que chegaram enquanto a pessoa lia lá em cima.
+    in-out property <int> unseen;
+    // A lista segue o fim: mensagem nova desce sozinha. Só a rolagem feita
+    // pela pessoa muda isso: vira false quando ela sobe e volta a true quando
+    // ela chega no fim de novo.
+    in-out property <bool> stick: true;
+
+    // Voz
+    in property <[VoiceItem]> voice-members;
+    in property <bool> in-voice;
+    in property <bool> voice-here;
+    in property <string> voice-server;
+    in property <int> voice-server-index: -1;
+    in property <bool> voice-connecting;
+    // Eu estou falando agora (anel verde no meu avatar do rodapé).
+    in property <bool> my-speaking;
+    in-out property <bool> muted;
+    in-out property <bool> deafened;
+    // Estado do microfone antes de ficar surdo, para voltar igual.
+    property <bool> muted-before-deafen;
+
+    // Atualização: versão nova disponível ("" = nenhuma) e se está baixando.
+    in property <string> update-version;
+    in property <string> current-version;
+    in property <bool> updating;
+
+    callback select-server(int);
+    callback send(string);
+    callback create-server(string);
+    callback join-server(string);
+    callback request-invite();
+    callback rename(string);
+    callback scroll-to-end();
+    callback join-voice();
+    callback leave-voice();
+    callback set-muted(bool);
+    callback set-deafened(bool);
+    callback install-update();
+    // Põe o cursor na caixa de mensagem (ao abrir um servidor).
+    callback focus-composer();
+    focus-composer => {
+        if dialog == "" { msg.focus(); }
+    }
+
+    function go-end() {
+        list.content-y = min(0px, list.visible-height - list.content-height);
+    }
+
+    scroll-to-end => {
+        root.stick = true;
+        root.unseen = 0;
+        root.go-end();
+    }
+
+    function toggle-mic() {
+        if root.deafened {
+            // Igual ao Discord: ligar o microfone também tira o surdo.
+            root.deafened = false;
+            root.muted = false;
+            root.set-deafened(false);
+        } else {
+            root.muted = !root.muted;
+        }
+        root.set-muted(root.muted);
+    }
+
+    function toggle-deafen() {
+        root.deafened = !root.deafened;
+        if root.deafened {
+            root.muted-before-deafen = root.muted;
+            root.muted = true;
+        } else {
+            root.muted = root.muted-before-deafen;
+        }
+        root.set-deafened(root.deafened);
+        root.set-muted(root.muted);
+    }
+
+    function close-dialog() {
+        root.dialog = "";
+        if current-server >= 0 { msg.focus(); }
+    }
+
+    Timer {
+        interval: 6s;
+        running: toast != "";
+        triggered => { root.toast = ""; }
+    }
+
+    HorizontalLayout {
+        // Coluna de servidores
+        Rectangle {
+            width: 72px;
+            background: Theme.rail;
+            VerticalLayout {
+                padding-top: 12px;
+                spacing: 8px;
+                alignment: start;
+                for s[i] in servers: ServerIcon {
+                    initials: s.initials;
+                    name: s.name;
+                    selected: i == current-server;
+                    unread: s.unread;
+                    clicked => { root.select-server(i); }
+                }
+                if servers.length > 0: HorizontalLayout {
+                    alignment: center;
+                    Rectangle { width: 32px; height: 2px; border-radius: 1px; background: #2b2d31; }
+                }
+                ServerIcon {
+                    add: true;
+                    name: "Adicionar servidor";
+                    clicked => { root.dialog = "add"; }
+                }
+                if update-version != "": ServerIcon {
+                    update: true;
+                    name: "Atualização disponível";
+                    clicked => { root.dialog = "update"; }
+                }
+            }
+        }
+
+        // Coluna de canais
+        Rectangle {
+            width: 240px;
+            background: Theme.side;
+            VerticalLayout {
+                Rectangle {
+                    height: 48px;
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 8px;
+                        spacing: 4px;
+                        Text {
+                            horizontal-stretch: 1;
+                            text: current-server >= 0 ? servers[current-server].name : "p2pcord";
+                            color: Theme.text;
+                            font-weight: 600;
+                            font-size: 15px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                        if current-server >= 0: VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                tip: "Convidar pessoas";
+                                tip-below: true;
+                                clicked => { root.dialog = "invite"; root.request-invite(); }
+                                UserPlusIcon { width: 18px; height: 18px; tint: Theme.muted; }
+                            }
+                        }
+                    }
+                    Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line; }
+                }
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 2px;
+                    alignment: start;
+                    if current-server >= 0: Text {
+                        text: "CANAIS";
+                        color: Theme.muted;
+                        font-size: 11px;
+                        font-weight: 700;
+                        height: 28px;
+                        vertical-alignment: center;
+                        x: 8px;
+                    }
+                    if current-server >= 0: ChannelRow { label: "geral"; selected: true; }
+                    if current-server >= 0: ChannelRow {
+                        label: "Voz";
+                        voice: true;
+                        selected: voice-here;
+                        hint: voice-here ? "" : "Entrar";
+                        clicked => { if !voice-here { root.join-voice(); } }
+                    }
+                    for u in voice-members: VoiceUser { user: u; }
+                }
+                Rectangle { vertical-stretch: 1; }
+
+                // Painel da chamada atual
+                if in-voice: Rectangle {
+                    height: 56px;
+                    background: Theme.panel;
+                    Rectangle { y: 0; height: 1px; background: #232428; }
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 10px;
+                        spacing: 8px;
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 1px;
+                            Text {
+                                text: voice-connecting ? "Conectando voz…" : "Voz conectada";
+                                color: voice-connecting ? Theme.warn : Theme.online;
+                                font-size: 13px;
+                                font-weight: 700;
+                            }
+                            Text {
+                                text: "Voz / " + voice-server;
+                                color: voice-server-ta.has-hover ? Theme.text : Theme.muted;
+                                font-size: 12px;
+                                overflow: elide;
+                                voice-server-ta := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => { if voice-server-index >= 0 { root.select-server(voice-server-index); } }
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                tip: "Sair da chamada";
+                                danger: true;
+                                clicked => { root.leave-voice(); }
+                                HangUpIcon { tint: white; }
+                            }
+                        }
+                    }
+                }
+
+                // Rodapé com o perfil e os controles de áudio
+                Rectangle {
+                    height: 56px;
+                    background: Theme.panel;
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 2px;
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            background: profile-ta.has-hover ? Theme.hover-strong : transparent;
+                            y: 8px;
+                            height: parent.height - 16px;
+                            accessible-role: button;
+                            accessible-label: "Trocar nome: " + my-name;
+                            accessible-action-default => { root.dialog = "profile"; }
+                            profile-ta := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => { root.dialog = "profile"; }
+                            }
+                            HorizontalLayout {
+                                padding-left: 4px;
+                                padding-right: 4px;
+                                spacing: 8px;
+                                Rectangle {
+                                    width: 32px;
+                                    Avatar { size: 32px; initial: my-initial; tint: my-color; speaking: my-speaking; }
+                                    // Bolinha de status
+                                    Rectangle {
+                                        x: 22px;
+                                        y: parent.height / 2 + 6px;
+                                        width: 12px;
+                                        height: 12px;
+                                        border-radius: 6px;
+                                        background: Theme.panel;
+                                        Rectangle {
+                                            width: 8px;
+                                            height: 8px;
+                                            border-radius: 4px;
+                                            background: status == "online" ? Theme.online : Theme.warn;
+                                        }
+                                    }
+                                }
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text { text: my-name; color: Theme.text; font-weight: 600; font-size: 13px; overflow: elide; }
+                                    Text {
+                                        text: profile-ta.has-hover ? "Trocar nome" : status;
+                                        color: Theme.muted;
+                                        font-size: 11px;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                off: muted;
+                                tip: muted ? "Ligar microfone" : "Desligar microfone";
+                                clicked => { root.toggle-mic(); }
+                                MicIcon { tint: muted ? Theme.danger : Theme.text; }
+                                if muted: SlashIcon { tint: Theme.danger; }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                off: deafened;
+                                tip: deafened ? "Ligar som" : "Desligar som";
+                                clicked => { root.toggle-deafen(); }
+                                HeadphonesIcon { tint: deafened ? Theme.danger : Theme.text; }
+                                if deafened: SlashIcon { tint: Theme.danger; }
+                            }
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            IconButton {
+                                tip: "Configurações";
+                                clicked => { root.dialog = "profile"; }
+                                GearIcon { tint: Theme.text; }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Área do chat
+        VerticalLayout {
+            horizontal-stretch: 1;
+            Rectangle {
+                height: 48px;
+                HorizontalLayout {
+                    padding-left: 16px;
+                    padding-right: 16px;
+                    spacing: 8px;
+                    if current-server >= 0: Rectangle {
+                        width: 22px;
+                        HashIcon { width: 22px; height: 22px; tint: Theme.muted; }
+                    }
+                    Text {
+                        horizontal-stretch: 1;
+                        text: current-server >= 0 ? "geral" : "";
+                        color: Theme.text;
+                        font-weight: 600;
+                        font-size: 15px;
+                        vertical-alignment: center;
+                    }
+                    if current-server >= 0: HorizontalLayout {
+                        horizontal-stretch: 0;
+                        spacing: 6px;
+                        Rectangle {
+                            y: (parent.height - 8px) / 2;
+                            width: 8px;
+                            height: 8px;
+                            border-radius: 4px;
+                            background: online > 0 ? Theme.online : Theme.muted;
+                        }
+                        Text {
+                            text: online == 0 ? "ninguém online" : online == 1 ? "1 pessoa online" : online + " pessoas online";
+                            color: Theme.muted;
+                            font-size: 13px;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+                Rectangle { y: parent.height - 1px; height: 1px; background: Theme.line; }
+            }
+
+            if current-server < 0: Rectangle {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 12px;
+                    HorizontalLayout {
+                        alignment: center;
+                        Text { text: "Nenhum servidor ainda"; color: Theme.text; font-size: 20px; font-weight: 700; }
+                    }
+                    HorizontalLayout {
+                        alignment: center;
+                        Text {
+                            text: "Crie um servidor para seus amigos ou entre num com um convite.";
+                            color: Theme.muted;
+                        }
+                    }
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 8px;
+                        Btn { text: "Criar servidor"; primary: true; clicked => { root.dialog = "add"; } }
+                        Btn { text: "Entrar com convite"; clicked => { root.dialog = "add"; } }
+                    }
+                }
+            }
+
+            Rectangle {
+                visible: current-server >= 0;
+                vertical-stretch: current-server >= 0 ? 1 : 0;
+                list := ListView {
+                    // A ListView só sabe a altura real dos itens depois de desenhá-los;
+                    // enquanto a lista segue o fim, cada ajuste de altura rola de novo.
+                    // A decisão de seguir o fim sai daqui, na hora da rolagem, e não de
+                    // um "changed content-y": a altura estimada muda enquanto se rola e
+                    // isso fazia a lista pular de volta para o fim.
+                    scrolled => {
+                        root.stick = self.content-y <= self.visible-height - self.content-height + 4px;
+                        if root.stick { root.unseen = 0; }
+                    }
+                    changed content-height => { if root.stick { root.go-end(); } }
+                    changed visible-height => { if root.stick { root.go-end(); } }
+                    for m[i] in messages: MessageRow { m: m; last: i == messages.length - 1; }
+                }
+                if messages.length == 0: VerticalLayout {
+                    padding: 16px;
+                    alignment: end;
+                    spacing: 4px;
+                    Text { text: "Este é o começo do #geral"; color: Theme.text; font-size: 22px; font-weight: 700; }
+                    Text { text: "Mande a primeira mensagem. Quem entrar depois recebe o histórico dos outros participantes."; color: Theme.muted; wrap: word-wrap; }
+                }
+                // Aviso de mensagens novas abaixo da área visível
+                if unseen > 0 && !stick: Rectangle {
+                    x: (parent.width - self.width) / 2;
+                    y: parent.height - self.height - 10px;
+                    width: unseen-row.preferred-width;
+                    height: 32px;
+                    border-radius: 16px;
+                    background: unseen-ta.has-hover ? Theme.accent-hover : Theme.accent;
+                    drop-shadow-blur: 8px;
+                    drop-shadow-color: #00000080;
+                    unseen-ta := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => { root.scroll-to-end(); }
+                    }
+                    unseen-row := HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 14px;
+                        spacing: 6px;
+                        Text {
+                            text: unseen == 1 ? "1 mensagem nova" : unseen + " mensagens novas";
+                            color: white;
+                            font-size: 13px;
+                            font-weight: 600;
+                            vertical-alignment: center;
+                        }
+                        VerticalLayout {
+                            alignment: center;
+                            ArrowDownIcon { width: 14px; height: 14px; tint: white; }
+                        }
+                    }
+                }
+            }
+
+            // Fica sempre criado (só some) para o foco poder voltar para ele.
+            Rectangle {
+                visible: current-server >= 0;
+                height: current-server >= 0 ? box.height + 32px : 0px;
+                box := Rectangle {
+                    x: 16px;
+                    y: 8px;
+                    width: parent.width - 32px;
+                    // Cresce com o texto até umas 8 linhas.
+                    height: max(44px, min(msg.preferred-height + 22px, 190px));
+                    border-radius: 8px;
+                    background: Theme.input;
+                    clip: true;
+                    msg := TextInput {
+                        x: 14px;
+                        // Quando passa do teto, mostra o fim do texto (onde se digita).
+                        y: min(11px, parent.height - 11px - self.preferred-height);
+                        width: parent.width - 28px;
+                        height: self.preferred-height;
+                        color: Theme.text;
+                        single-line: false;
+                        wrap: word-wrap;
+                        accessible-role: text-input;
+                        accessible-label: "Mensagem para #geral";
+                        // Enter envia; Shift+Enter quebra a linha.
+                        key-pressed(e) => {
+                            if e.text == Key.Return && !e.modifiers.shift {
+                                if self.text != "" {
+                                    root.send(self.text);
+                                    self.text = "";
+                                }
+                                return accept;
+                            }
+                            reject
+                        }
+                    }
+                    if msg.text == "": Text {
+                        x: 14px;
+                        y: 11px;
+                        height: msg.font-metrics.ascent - msg.font-metrics.descent;
+                        text: "Conversar em #geral";
+                        color: Theme.muted;
+                    }
+                }
+            }
+        }
+    }
+
+    // Erro passageiro
+    if toast != "": Rectangle {
+        x: (root.width - self.width) / 2 + 156px;
+        y: 60px;
+        width: min(toast-text.preferred-width + 32px, root.width - 360px);
+        height: toast-text.preferred-height + 18px;
+        border-radius: 6px;
+        background: Theme.danger;
+        drop-shadow-blur: 10px;
+        drop-shadow-color: #00000080;
+        TouchArea { clicked => { root.toast = ""; } }
+        toast-text := Text {
+            x: 16px;
+            width: parent.width - 32px;
+            text: toast;
+            color: white;
+            font-size: 13px;
+            wrap: word-wrap;
+        }
+    }
+
+    // Diálogos
+    if dialog != "": Rectangle {
+        background: #000000b0;
+        TouchArea {
+            // A pergunta do nome na primeira execução não fecha clicando fora.
+            clicked => { if dialog != "welcome" { root.close-dialog(); } }
+        }
+        FocusScope {
+            focus-on-click: false;
+            focus-on-tab-navigation: false;
+            key-pressed(e) => {
+                if e.text == Key.Escape && dialog != "welcome" {
+                    root.close-dialog();
+                    return accept;
+                }
+                reject
+            }
+            Rectangle {
+                width: 440px;
+                height: dlg.preferred-height;
+                border-radius: 8px;
+                background: Theme.side;
+                drop-shadow-blur: 24px;
+                drop-shadow-color: #00000080;
+                TouchArea { }
+                dlg := VerticalLayout {
+                    padding: 24px;
+                    spacing: 12px;
+
+                    if dialog == "add": VerticalLayout {
+                        spacing: 10px;
+                        DialogTitle { text: "Criar servidor"; }
+                        DialogText { text: "Um servidor é um grupo com chat e canal de voz. Depois é só mandar o convite."; }
+                        FieldLabel { text: "NOME DO SERVIDOR"; }
+                        new-name := LineEdit {
+                            placeholder-text: "Ex.: Amigos";
+                            init => { self.focus(); }
+                            accepted => { if self.text != "" { root.create-server(self.text); root.close-dialog(); } }
+                        }
+                        HorizontalLayout {
+                            alignment: end;
+                            Btn {
+                                text: "Criar";
+                                primary: true;
+                                enabled: new-name.text != "";
+                                clicked => { root.create-server(new-name.text); root.close-dialog(); }
+                            }
+                        }
+                        Rectangle { height: 1px; background: #2b2d31; }
+                        DialogTitle { text: "Entrar com convite"; font-size: 16px; }
+                        FieldLabel { text: "CÓDIGO DO CONVITE"; }
+                        ticket := LineEdit {
+                            placeholder-text: "p2pcord:...";
+                            accepted => { if self.text != "" { root.join-server(self.text); root.close-dialog(); } }
+                        }
+                        HorizontalLayout {
+                            alignment: end;
+                            Btn {
+                                text: "Entrar";
+                                enabled: ticket.text != "";
+                                clicked => { root.join-server(ticket.text); root.close-dialog(); }
+                            }
+                        }
+                    }
+
+                    if dialog == "invite": VerticalLayout {
+                        property <bool> copied;
+                        spacing: 10px;
+                        DialogTitle { text: "Convidar para " + (current-server >= 0 ? servers[current-server].name : ""); }
+                        DialogText {
+                            text: "Mande este código para quem vai entrar. Ele leva seu endereço atual, então gere um novo se o seu IP mudar.";
+                        }
+                        HorizontalLayout {
+                            spacing: 8px;
+                            invite-edit := LineEdit {
+                                text: invite-text;
+                                read-only: true;
+                                // Foco no campo para o Esc chegar no diálogo.
+                                init => { self.focus(); }
+                            }
+                            Btn {
+                                text: copied ? "Copiado!" : "Copiar";
+                                primary: true;
+                                enabled: invite-text != "gerando…" && invite-text != "";
+                                clicked => {
+                                    invite-edit.select-all();
+                                    invite-edit.copy();
+                                    copied = true;
+                                }
+                            }
+                        }
+                        HorizontalLayout {
+                            alignment: end;
+                            Btn { text: "Fechar"; clicked => { root.close-dialog(); } }
+                        }
+                    }
+
+                    if dialog == "update": VerticalLayout {
+                        spacing: 10px;
+                        DialogTitle { text: "Atualização disponível"; }
+                        DialogText {
+                            text: updating
+                                ? "Baixando a versão " + update-version + "… o p2pcord reinicia sozinho quando terminar."
+                                : "A versão " + update-version + " está pronta (você está na " + current-version + "). O p2pcord vai baixar, reiniciar e voltar onde estava. Se estiver numa call, ela é encerrada.";
+                        }
+                        HorizontalLayout {
+                            alignment: end;
+                            spacing: 8px;
+                            Btn { text: "Depois"; enabled: !updating; clicked => { root.close-dialog(); } }
+                            Btn {
+                                text: updating ? "Baixando…" : "Atualizar agora";
+                                primary: true;
+                                enabled: !updating;
+                                clicked => { root.install-update(); }
+                            }
+                        }
+                    }
+
+                    if dialog == "profile" || dialog == "welcome": VerticalLayout {
+                        spacing: 10px;
+                        DialogTitle { text: dialog == "welcome" ? "Bem-vindo ao p2pcord" : "Perfil"; }
+                        if dialog == "welcome": DialogText {
+                            text: "Como você quer aparecer para os outros? Dá para trocar depois clicando no seu nome.";
+                        }
+                        HorizontalLayout {
+                            spacing: 12px;
+                            VerticalLayout {
+                                alignment: center;
+                                Avatar {
+                                    size: 48px;
+                                    initial: name-edit.text == "" ? "?" : my-initial;
+                                    tint: my-color;
+                                }
+                            }
+                            VerticalLayout {
+                                spacing: 6px;
+                                FieldLabel { text: "NOME DE EXIBIÇÃO"; }
+                                name-edit := LineEdit {
+                                    text: dialog == "welcome" ? "" : my-name;
+                                    placeholder-text: "Seu nome";
+                                    init => { self.focus(); self.select-all(); }
+                                    accepted => { if self.text != "" { root.rename(self.text); root.close-dialog(); } }
+                                }
+                            }
+                        }
+                        if dialog == "profile": Text {
+                            text: "ID: " + my-id;
+                            color: Theme.muted;
+                            font-size: 11px;
+                            wrap: char-wrap;
+                        }
+                        HorizontalLayout {
+                            alignment: end;
+                            spacing: 8px;
+                            Btn {
+                                text: dialog == "welcome" ? "Agora não" : "Cancelar";
+                                clicked => { root.close-dialog(); }
+                            }
+                            Btn {
+                                text: dialog == "welcome" ? "Continuar" : "Salvar";
+                                primary: true;
+                                enabled: name-edit.text != "";
+                                clicked => { root.rename(name-edit.text); root.close-dialog(); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

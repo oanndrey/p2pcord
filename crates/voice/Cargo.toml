@@ -1,0 +1,10 @@
+[package]
+name = "p2pcord-voice"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cpal = "0.18"
+unsafe-libopus = "0.2"
+anyhow.workspace = true
+ringbuf = "0.4"
