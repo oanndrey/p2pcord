@@ -1,4 +1,4 @@
-# Publica uma versão nova do p2pcord: compila, assina e cria a release no GitHub.
+﻿# Publica uma versão nova do p2pcord: compila, assina e cria a release no GitHub.
 # Os apps abertos acham a versão nova em até 6 h (ou ao abrir) e mostram o botão verde.
 #
 # Antes: suba o `version` em Cargo.toml ([workspace.package]).
